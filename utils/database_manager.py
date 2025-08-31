@@ -9,7 +9,7 @@ class DatabaseManager:
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
         self.db_path = db_path
         self.setup_database()
-        
+
     def setup_database(self):
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -46,7 +46,7 @@ class DatabaseManager:
         
         conn.commit()
         conn.close()
-    
+
     def generate_sample_data(self):
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -69,10 +69,10 @@ class DatabaseManager:
         # Generate feedback data
         for _ in range(150):
             cursor.execute('''
-                INSERT INTO customer_feedback 
-                (customer_id, feature_request, feedback_type, priority_level, source, 
-                 customer_segment, revenue_impact, effort_estimate, business_value_score)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO customer_feedback
+            (customer_id, feature_request, feedback_type, priority_level, source,
+            customer_segment, revenue_impact, effort_estimate, business_value_score)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 random.choice(customers),
                 random.choice(features),
@@ -88,10 +88,10 @@ class DatabaseManager:
         # Generate usage data
         for _ in range(300):
             cursor.execute('''
-                INSERT INTO usage_metrics 
-                (feature_name, user_id, usage_count, session_duration, date_recorded,
-                 user_segment, conversion_impact, retention_impact)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO usage_metrics
+            (feature_name, user_id, usage_count, session_duration, date_recorded,
+            user_segment, conversion_impact, retention_impact)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 random.choice(features),
                 f"USER_{random.randint(1, 200):04d}",
@@ -106,12 +106,12 @@ class DatabaseManager:
         conn.commit()
         conn.close()
         return True
-    
+
     def get_feedback_summary(self):
         try:
             conn = sqlite3.connect(self.db_path)
             query = '''
-            SELECT 
+            SELECT
                 feature_request,
                 COUNT(*) as request_count,
                 AVG(business_value_score) as avg_business_value,
@@ -120,7 +120,7 @@ class DatabaseManager:
                 customer_segment,
                 priority_level,
                 feedback_type
-            FROM customer_feedback 
+            FROM customer_feedback
             GROUP BY feature_request, customer_segment, priority_level, feedback_type
             ORDER BY request_count DESC
             '''
@@ -130,12 +130,12 @@ class DatabaseManager:
         except Exception as e:
             print(f"Error in get_feedback_summary: {e}")
             return pd.DataFrame()
-    
+
     def get_usage_analytics(self):
         try:
             conn = sqlite3.connect(self.db_path)
             query = '''
-            SELECT 
+            SELECT
                 feature_name,
                 COUNT(DISTINCT user_id) as unique_users,
                 AVG(usage_count) as avg_usage,
@@ -144,7 +144,7 @@ class DatabaseManager:
                 AVG(retention_impact) as avg_retention_impact,
                 user_segment,
                 date_recorded
-            FROM usage_metrics 
+            FROM usage_metrics
             GROUP BY feature_name, user_segment, date_recorded
             ORDER BY unique_users DESC
             '''
@@ -154,7 +154,7 @@ class DatabaseManager:
         except Exception as e:
             print(f"Error in get_usage_analytics: {e}")
             return pd.DataFrame()
-    
+
     def get_feature_analytics_summary(self):
         """Get feature analytics - SQLite compatible (no FULL OUTER JOIN)"""
         try:
@@ -162,7 +162,7 @@ class DatabaseManager:
             
             # Get feedback data
             feedback_query = '''
-            SELECT 
+            SELECT
                 feature_request as feature_name,
                 COUNT(*) as request_count,
                 AVG(business_value_score) as avg_business_value,
@@ -170,24 +170,25 @@ class DatabaseManager:
                 AVG(effort_estimate) as avg_effort,
                 SUM(CASE WHEN priority_level = 'critical' THEN 1 ELSE 0 END) as critical_requests,
                 SUM(CASE WHEN priority_level = 'high' THEN 1 ELSE 0 END) as high_requests
-            FROM customer_feedback 
+            FROM customer_feedback
             GROUP BY feature_request
             '''
             feedback_df = pd.read_sql(feedback_query, conn)
             
             # Get usage data
             usage_query = '''
-            SELECT 
+            SELECT
                 feature_name,
                 COUNT(DISTINCT user_id) as unique_users,
                 AVG(usage_count) as avg_usage,
                 AVG(session_duration) as avg_session_duration,
                 AVG(conversion_impact) as avg_conversion_impact,
                 AVG(retention_impact) as avg_retention_impact
-            FROM usage_metrics 
+            FROM usage_metrics
             GROUP BY feature_name
             '''
             usage_df = pd.read_sql(usage_query, conn)
+            
             conn.close()
             
             # Use pandas merge instead of SQL FULL OUTER JOIN
@@ -212,24 +213,23 @@ class DatabaseManager:
             
         except Exception as e:
             print(f"Error in get_feature_analytics_summary: {e}")
-            # Return empty DataFrame with correct columns
             return pd.DataFrame(columns=[
-                'feature_name', 'request_count', 'avg_business_value', 
-                'avg_revenue_impact', 'avg_effort', 'critical_requests', 
-                'high_requests', 'unique_users', 'avg_usage', 
+                'feature_name', 'request_count', 'avg_business_value',
+                'avg_revenue_impact', 'avg_effort', 'critical_requests',
+                'high_requests', 'unique_users', 'avg_usage',
                 'avg_session_duration', 'avg_conversion_impact', 'avg_retention_impact'
             ])
-    
+
     def add_feedback(self, feedback_data):
         try:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
             
             cursor.execute('''
-                INSERT INTO customer_feedback 
-                (customer_id, feature_request, feedback_type, priority_level, source, 
-                 customer_segment, revenue_impact, effort_estimate, business_value_score)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO customer_feedback
+            (customer_id, feature_request, feedback_type, priority_level, source,
+            customer_segment, revenue_impact, effort_estimate, business_value_score)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', feedback_data)
             
             conn.commit()
@@ -238,7 +238,7 @@ class DatabaseManager:
         except Exception as e:
             print(f"Error adding feedback: {e}")
             return False
-    
+
     def log_ai_query(self, query_text, role, response):
         """Log AI queries - simplified implementation"""
         try:
@@ -246,18 +246,18 @@ class DatabaseManager:
             cursor = conn.cursor()
             
             cursor.execute('''
-                CREATE TABLE IF NOT EXISTS ai_queries (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    query_text TEXT,
-                    role TEXT,
-                    response TEXT,
-                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-                )
+            CREATE TABLE IF NOT EXISTS ai_queries (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                query_text TEXT,
+                role TEXT,
+                response TEXT,
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
             ''')
             
             cursor.execute('''
-                INSERT INTO ai_queries (query_text, role, response)
-                VALUES (?, ?, ?)
+            INSERT INTO ai_queries (query_text, role, response)
+            VALUES (?, ?, ?)
             ''', (query_text, role, str(response)))
             
             conn.commit()
