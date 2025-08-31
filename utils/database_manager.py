@@ -59,14 +59,15 @@ class DatabaseManager:
             "Dark mode support", "Advanced search filters", "Mobile app improvements",
             "API rate limiting", "Real-time notifications", "Export functionality",
             "User role management", "Dashboard customization", "Integration with Slack",
-            "Performance optimization", "Multi-language support", "Advanced analytics"
+            "Performance optimization", "Multi-language support", "Advanced analytics",
+            "Two-factor authentication", "Bulk data import", "Custom reporting"
         ]
         
         customers = [f"CUST_{i:04d}" for i in range(1, 101)]
         segments = ["Enterprise", "SMB", "Startup", "Individual"]
         
         # Generate feedback data
-        for _ in range(100):
+        for _ in range(150):
             cursor.execute('''
                 INSERT INTO customer_feedback 
                 (customer_id, feature_request, feedback_type, priority_level, source, 
@@ -85,7 +86,7 @@ class DatabaseManager:
             ))
         
         # Generate usage data
-        for _ in range(200):
+        for _ in range(300):
             cursor.execute('''
                 INSERT INTO usage_metrics 
                 (feature_name, user_id, usage_count, session_duration, date_recorded,
@@ -155,11 +156,11 @@ class DatabaseManager:
             return pd.DataFrame()
     
     def get_feature_analytics_summary(self):
-        """Get comprehensive feature analytics - SQLite compatible version"""
+        """Get feature analytics - SQLite compatible (no FULL OUTER JOIN)"""
         try:
             conn = sqlite3.connect(self.db_path)
             
-            # First get feedback data
+            # Get feedback data
             feedback_query = '''
             SELECT 
                 feature_request as feature_name,
@@ -174,7 +175,7 @@ class DatabaseManager:
             '''
             feedback_df = pd.read_sql(feedback_query, conn)
             
-            # Then get usage data
+            # Get usage data
             usage_query = '''
             SELECT 
                 feature_name,
@@ -189,23 +190,35 @@ class DatabaseManager:
             usage_df = pd.read_sql(usage_query, conn)
             conn.close()
             
-            # Merge the dataframes using pandas (not SQL)
+            # Use pandas merge instead of SQL FULL OUTER JOIN
             merged_df = pd.merge(feedback_df, usage_df, on='feature_name', how='outer')
-            merged_df = merged_df.fillna(0)
             
             # Fill missing values with defaults
-            merged_df['avg_business_value'] = merged_df['avg_business_value'].fillna(5)
-            merged_df['avg_revenue_impact'] = merged_df['avg_revenue_impact'].fillna(10000)
-            merged_df['avg_effort'] = merged_df['avg_effort'].fillna(8)
-            merged_df['avg_session_duration'] = merged_df['avg_session_duration'].fillna(30)
-            merged_df['avg_conversion_impact'] = merged_df['avg_conversion_impact'].fillna(0.05)
-            merged_df['avg_retention_impact'] = merged_df['avg_retention_impact'].fillna(0.08)
+            merged_df = merged_df.fillna({
+                'request_count': 0,
+                'avg_business_value': 5,
+                'avg_revenue_impact': 10000,
+                'avg_effort': 8,
+                'critical_requests': 0,
+                'high_requests': 0,
+                'unique_users': 0,
+                'avg_usage': 0,
+                'avg_session_duration': 30,
+                'avg_conversion_impact': 0.05,
+                'avg_retention_impact': 0.08
+            })
             
             return merged_df
             
         except Exception as e:
             print(f"Error in get_feature_analytics_summary: {e}")
-            return pd.DataFrame()
+            # Return empty DataFrame with correct columns
+            return pd.DataFrame(columns=[
+                'feature_name', 'request_count', 'avg_business_value', 
+                'avg_revenue_impact', 'avg_effort', 'critical_requests', 
+                'high_requests', 'unique_users', 'avg_usage', 
+                'avg_session_duration', 'avg_conversion_impact', 'avg_retention_impact'
+            ])
     
     def add_feedback(self, feedback_data):
         try:
@@ -227,5 +240,30 @@ class DatabaseManager:
             return False
     
     def log_ai_query(self, query_text, role, response):
-        return True  # Simplified for now
+        """Log AI queries - simplified implementation"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS ai_queries (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    query_text TEXT,
+                    role TEXT,
+                    response TEXT,
+                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            cursor.execute('''
+                INSERT INTO ai_queries (query_text, role, response)
+                VALUES (?, ?, ?)
+            ''', (query_text, role, str(response)))
+            
+            conn.commit()
+            conn.close()
+            return True
+        except Exception as e:
+            print(f"Error logging AI query: {e}")
+            return False
 
